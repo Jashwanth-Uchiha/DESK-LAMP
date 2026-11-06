@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+.firebaserc
+*-debug.log
+firebase-debug*.log
+database-debug.log
+ui-debug.log
+.firebase/
+# Local editor/agent settings (contain machine-specific paths)
+.claude/
+# Admin SDK credentials must never be committed
+service-account*.json
+*-adminsdk-*.json

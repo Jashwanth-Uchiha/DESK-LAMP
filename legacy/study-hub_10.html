@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Desk Lamp — Study Hub</title>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg: #12151c;
+    --panel: #191d27;
+    --panel-2: #1f2430;
+    --line: #2b3141;
+    --amber: #e8a33d;
+    --amber-dim: #8a6528;
+    --text: #e9e7e1;
+    --text-dim: #8b90a0;
+    --green: #6fae8c;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family: 'Georgia', 'Iowan Old Style', serif;
+    min-height:100vh;
+  }
+  .mono{ font-family: 'Courier New', monospace; letter-spacing:0.5px; }
+  #app{max-width:920px; margin:0 auto; padding:24px 18px 60px;}
+
+  /* Login */
+  #login{ min-height:80vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+  #login h1{ font-size:2.1rem; font-weight:400; margin-bottom:6px; }
+  #login p{ color:var(--text-dim); margin-top:0; font-size:0.95rem; max-width:340px;}
+  #login input{
+    width:280px; padding:12px 14px; margin:8px 0; border-radius:2px;
+    border:1px solid var(--line); background:var(--panel); color:var(--text);
+    font-family: 'Courier New', monospace; font-size:1rem;
+  }
+  #login button, .btn{
+    margin-top:14px; padding:11px 22px; background:var(--amber); color:#1a1a1a;
+    border:none; border-radius:2px; font-size:0.95rem; cursor:pointer; font-family:inherit;
+  }
+  #login button:hover, .btn:hover{ background:#f0b455; }
+
+  /* Header / nav */
+  header{ display:flex; justify-content:space-between; align-items:baseline; border-bottom:1px solid var(--line); padding-bottom:14px; margin-bottom:18px;}
+  header h1{ font-size:1.4rem; font-weight:400; margin:0; }
+  header .who{ color:var(--text-dim); font-size:0.85rem; }
+  nav{ display:flex; gap:2px; margin-bottom:22px; border-bottom:1px solid var(--line); }
+  nav button{
+    background:none; border:none; color:var(--text-dim); padding:10px 16px; cursor:pointer;
+    font-family:inherit; font-size:0.95rem; border-bottom:2px solid transparent;
+  }
+  nav button.active{ color:var(--amber); border-bottom:2px solid var(--amber); }
+
+  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:2px; padding:18px; }
+  .hidden{ display:none !important; }
+
+  /* Chat */
+  #chatLog{ height:360px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; padding-right:6px; }
+  .msg{ max-width:75%; display:flex; gap:8px; align-items:flex-end; }
+  .msg .avatar{ width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.7rem; color:#fff; flex-shrink:0; font-family:'Courier New', monospace; }
+  .msg .col{ display:flex; flex-direction:column; }
+  .msg .name{ font-size:0.72rem; color:var(--amber-dim); margin-bottom:2px; }
+  .msg .bubbleRow{ display:flex; align-items:flex-end; gap:6px; }
+  .msg .bubble{ background:var(--panel-2); padding:8px 12px; border-radius:10px 10px 10px 2px; font-size:0.92rem; line-height:1.4; }
+  .msg.mine{ align-self:flex-end; flex-direction:row-reverse; }
+  .msg.mine .bubble{ background:#25532f; border-radius:10px 10px 2px 10px; }
+  .msg.mine .col{ align-items:flex-end; }
+  .msg.mine .bubbleRow{ flex-direction:row-reverse; }
+  .liftMini{ background:none; border:1px solid var(--line); color:var(--text-dim); border-radius:2px; width:22px; height:22px; font-size:0.75rem; cursor:pointer; flex-shrink:0; }
+  .liftMini.voted{ color:var(--amber); border-color:var(--amber-dim); }
+  .msg .votes{ font-size:0.65rem; color:var(--text-dim); margin-top:2px; }
+  .chatRow{ display:flex; gap:8px; margin-top:14px; }
+  .chatRow input{ flex:1; padding:10px 12px; background:var(--panel-2); border:1px solid var(--line); color:var(--text); border-radius:2px; font-family:inherit; }
+  .trendMsg{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); }
+  .trendMsg .t{ font-size:0.9rem; }
+  .trendMsg .n{ font-size:0.72rem; color:var(--amber-dim); }
+
+  /* Discussion */
+  .subtabs{ display:flex; gap:14px; margin-bottom:14px; }
+  .subtabs span{ color:var(--text-dim); cursor:pointer; font-size:0.9rem; padding-bottom:4px; }
+  .subtabs span.active{ color:var(--text); border-bottom:1px solid var(--amber); }
+  .post{ display:flex; gap:14px; padding:14px 0; border-bottom:1px solid var(--line); }
+  .lift{ display:flex; flex-direction:column; align-items:center; min-width:36px; }
+  .lift button{ background:none; border:1px solid var(--line); color:var(--text-dim); width:30px; height:30px; border-radius:2px; cursor:pointer; font-size:1rem; }
+  .lift button.voted{ color:var(--amber); border-color:var(--amber-dim); }
+  .lift .count{ font-size:0.85rem; margin-top:4px; color:var(--text-dim); }
+  .post .body{ flex:1; }
+  .post .meta{ font-size:0.72rem; color:var(--amber-dim); margin-bottom:4px; }
+  .post .text{ font-size:0.95rem; line-height:1.45; }
+  .postForm{ display:flex; gap:8px; margin-bottom:6px; }
+  .postForm textarea{ flex:1; padding:10px; background:var(--panel-2); border:1px solid var(--line); color:var(--text); border-radius:2px; font-family:inherit; resize:vertical; min-height:44px; }
+
+  /* Todo */
+  .todoRow{ display:flex; gap:8px; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); }
+  .todoRow input[type=checkbox]{ accent-color: var(--amber); }
+  .todoRow .txt{ flex:1; font-size:0.95rem; }
+  .todoRow .txt.done{ text-decoration:line-through; color:var(--text-dim); }
+  .todoRow .del{ background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:1rem; }
+  .addRow{ display:flex; gap:8px; margin-bottom:10px; }
+  .addRow input{ flex:1; padding:10px; background:var(--panel-2); border:1px solid var(--line); color:var(--text); border-radius:2px; font-family:inherit; }
+
+  /* Pomodoro */
+  #pomo{ text-align:center; padding:40px 10px; }
+  #pomoTime{ font-size:4.2rem; letter-spacing:2px; }
+  #pomoLabel{ color:var(--text-dim); font-size:0.9rem; margin-bottom:20px; }
+  .pomoBtns{ display:flex; gap:10px; justify-content:center; margin-top:22px; }
+  .pomoBtns button{ padding:9px 18px; background:none; border:1px solid var(--line); color:var(--text); border-radius:2px; cursor:pointer; font-family:inherit; }
+  .pomoBtns button.primary{ background:var(--amber); color:#1a1a1a; border:none; }
+  .pomoModes{ display:flex; gap:8px; justify-content:center; margin-bottom:10px; }
+  .pomoModes span{ font-size:0.8rem; color:var(--text-dim); padding:4px 10px; border:1px solid var(--line); border-radius:12px; cursor:pointer; }
+  .pomoModes span.active{ color:var(--amber); border-color:var(--amber-dim); }
+
+  /* Streak heatmap */
+  .streakWrap{ margin-top:36px; text-align:left; }
+  .streakHead{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; flex-wrap:wrap; gap:6px; }
+  .streakHead .big{ font-size:1.3rem; }
+  .streakHead .stat{ font-size:0.8rem; color:var(--text-dim); }
+  .streakHead .stat b{ color:var(--text); font-weight:400; }
+  .heatmap{ display:flex; gap:3px; overflow-x:auto; padding-bottom:6px; }
+  .heatcol{ display:flex; flex-direction:column; gap:3px; }
+  .heatcell{ width:11px; height:11px; border-radius:2px; background:#232838; }
+  .heatcell.l1{ background:#2c4a34; }
+  .heatcell.l2{ background:#3a6b46; }
+  .heatcell.l3{ background:#4f9660; }
+  .heatcell.l4{ background:var(--green); }
+  .heatMonths{ display:flex; gap:3px; font-size:0.68rem; color:var(--text-dim); margin-top:4px; }
+
+  /* Theme picker */
+  .themeRow{ display:flex; gap:8px; align-items:center; }
+  .themeDot{ width:22px; height:22px; border-radius:50%; cursor:pointer; border:2px solid transparent; }
+  .themeDot.active{ border-color:var(--text); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <p id="localBanner" class="hidden" style="max-width:520px; margin:14px auto 0; text-align:center; font-size:0.8rem; color:var(--text-dim); border:1px solid var(--line); border-radius:2px; padding:8px 14px;">
+    Running in local-only mode — chat and discussion only sync on this device. Add your Firebase config near the top of the file to enable syncing across everyone's devices.
+  </p>
+
+  <div id="login">
+    <h1>Desk Lamp</h1>
+    <p>A quiet corner for chat, doubts, tasks, and focused work.</p>
+    <input id="idInput" class="mono" placeholder="ID number (e.g. roll no.)" maxlength="20">
+    <p id="welcomeBack" class="hidden" style="color:var(--green); font-size:0.85rem; margin:2px 0;"></p>
+    <input id="nameInput" placeholder="Your name">
+    <input id="passInput" type="password" placeholder="Password">
+    <div><button onclick="doLogin()">Enter</button></div>
+    <p id="loginErr" style="color:#c96a5a; font-size:0.85rem;"></p>
+  </div>
+
+  <div id="main" class="hidden">
+    <header>
+      <h1>Desk Lamp</h1>
+      <div style="display:flex; align-items:center; gap:16px;">
+        <div class="themeRow" id="themeRow"></div>
+        <div class="who" id="whoami"></div>
+      </div>
+    </header>
+    <nav>
+      <button class="active" data-tab="chat">Chat</button>
+      <button data-tab="discuss">Discussion</button>
+      <button data-tab="todo">To-Do</button>
+      <button data-tab="pomo">Pomodoro</button>
+    </nav>
+
+    <section id="tab-chat" class="panel">
+      <div class="subtabs">
+        <span class="active" data-chatview="room">Room</span>
+        <span data-chatview="trending">Trending</span>
+      </div>
+      <div id="chatRoomView">
+        <div id="chatLog"></div>
+        <div class="chatRow">
+          <input id="chatInput" placeholder="Say something…" onkeydown="if(event.key==='Enter')sendChat()">
+          <button class="btn" onclick="sendChat()">Send</button>
+        </div>
+      </div>
+      <div id="chatTrendView" class="hidden"></div>
+    </section>
+
+    <section id="tab-discuss" class="panel hidden">
+      <div class="postForm">
+        <textarea id="postInput" placeholder="Post a doubt or a note for the room…"></textarea>
+        <button class="btn" onclick="addPost()">Post</button>
+      </div>
+      <div class="subtabs">
+        <span class="active" data-sort="new">Newest</span>
+        <span data-sort="top">Trending</span>
+      </div>
+      <div id="postList"></div>
+    </section>
+
+    <section id="tab-todo" class="panel hidden">
+      <div class="addRow">
+        <input id="todoInput" placeholder="Add a task…" onkeydown="if(event.key==='Enter')addTodo()">
+        <button class="btn" onclick="addTodo()">Add</button>
+      </div>
+      <div id="todoList"></div>
+    </section>
+
+    <section id="tab-pomo" class="panel hidden">
+      <div id="pomo">
+        <div class="pomoModes">
+          <span class="active" data-len="25">Focus 25</span>
+          <span data-len="5">Break 5</span>
+          <span data-len="15">Long break 15</span>
+        </div>
+        <div id="pomoLabel">Focus session</div>
+        <div id="pomoTime" class="mono">25:00</div>
+        <div class="pomoBtns">
+          <button class="primary" id="pomoStart" onclick="togglePomo()">Start</button>
+          <button onclick="resetPomo()">Reset</button>
+        </div>
+      </div>
+      <div class="streakWrap">
+        <div class="streakHead">
+          <div class="big" id="streakTotal">0 <span style="font-size:0.85rem; color:var(--text-dim); font-weight:400;">focus sessions in the past year</span></div>
+          <div class="stat">Active days: <b id="streakDays">0</b> &nbsp; Max streak: <b id="streakMax">0</b></div>
+        </div>
+        <div id="heatmapBox">
+          <div class="heatmap" id="heatmap"></div>
+          <div class="heatMonths" id="heatMonths"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+let ME = null; // {id, name}
+let chatPoll, postPoll;
+
+// ============================================================
+// FIREBASE SETUP — paste your own project's config here to make
+// chat and discussion sync across everyone's phones/laptops.
+// Leave as-is to run in local-only mode (works on one device).
+// See the setup steps shared alongside this file for how to get
+// these values from https://console.firebase.google.com
+// ============================================================
+const FIREBASE_CONFIG = {
+  // Real project values redacted from this reference copy. Do not run the legacy app against production.
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId: "YOUR_PROJECT"
+};
+
+let fbDb = null;
+function initFirebase(){
+  if(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY' && window.firebase){
+    try{
+      firebase.initializeApp(FIREBASE_CONFIG);
+      fbDb = firebase.database();
+    }catch(e){ fbDb = null; }
+  }
+  if(!fbDb){
+    document.getElementById('localBanner').classList.remove('hidden');
+  }
+}
+function fbPath(key){ return key.replace(/[.#$\[\]]/g, '_'); }
+async function fbGet(key){
+  if(!fbDb) return undefined;
+  try{
+    const snap = await fbDb.ref(fbPath(key)).get();
+    return snap.exists() ? {value: JSON.stringify(snap.val())} : null;
+  }catch(e){ return undefined; }
+}
+async function fbSet(key, value){
+  if(!fbDb) return undefined;
+  try{
+    await fbDb.ref(fbPath(key)).set(JSON.parse(value));
+    return {value};
+  }catch(e){ return undefined; }
+}
+
+function safeParse(s, fallback){ try{ return JSON.parse(s); }catch(e){ return fallback; } }
+
+// Storage layer: tries Firebase first (real cross-device sync), then the Claude
+// artifact storage API (works when opened as a shared Claude.ai artifact), then
+// falls back to the browser's own localStorage (works on this device only).
+async function sGet(key){
+  const f = await fbGet(key);
+  if(f !== undefined) return f;
+  if(window.storage){
+    try{ return await window.storage.get(key, true); }catch(e){ /* fall through */ }
+  }
+  try{
+    const v = localStorage.getItem(key);
+    return v===null ? null : {value: v};
+  }catch(e){ return null; }
+}
+async function sSet(key, value){
+  const f = await fbSet(key, value);
+  if(f !== undefined) return f;
+  if(window.storage){
+    try{ return await window.storage.set(key, value, true); }catch(e){ /* fall through */ }
+  }
+  try{ localStorage.setItem(key, value); return {value}; }catch(e){ return null; }
+}
+initFirebase();
+
+// ---- Themes ----
+const THEMES = {
+  desklamp: { label:'Desk Lamp', bg:'#12151c', panel:'#191d27', panel2:'#1f2430', line:'#2b3141', accent:'#e8a33d', accentDim:'#8a6528', text:'#e9e7e1', textDim:'#8b90a0', green:'#6fae8c' },
+  daylight: { label:'Daylight', bg:'#f2f0e8', panel:'#ffffff', panel2:'#eae7db', line:'#d9d5c6', accent:'#3f6b5e', accentDim:'#7c978d', text:'#242320', textDim:'#6b6a60', green:'#3f6b5e' },
+  forest:   { label:'Forest', bg:'#0f1712', panel:'#152019', panel2:'#1b2a21', line:'#26392c', accent:'#8fbf6d', accentDim:'#5f8f49', text:'#e7ece4', textDim:'#8fa08c', green:'#8fbf6d' },
+  ocean:    { label:'Ocean', bg:'#0b1420', panel:'#101d2e', panel2:'#152437', line:'#1f3247', accent:'#5ec8d8', accentDim:'#3a8a96', text:'#e7f2f5', textDim:'#7ea0ac', green:'#5ec8d8' },
+  sunset:   { label:'Sunset', bg:'#1c1018', panel:'#241621', panel2:'#2c1b28', line:'#3d2436', accent:'#e6875a', accentDim:'#a85f3c', text:'#f3e6e0', textDim:'#b08a90', green:'#e6875a' }
+};
+function applyTheme(name){
+  const t = THEMES[name] || THEMES.desklamp;
+  const r = document.documentElement.style;
+  r.setProperty('--bg', t.bg);
+  r.setProperty('--panel', t.panel);
+  r.setProperty('--panel-2', t.panel2);
+  r.setProperty('--line', t.line);
+  r.setProperty('--amber', t.accent);
+  r.setProperty('--amber-dim', t.accentDim);
+  r.setProperty('--text', t.text);
+  r.setProperty('--text-dim', t.textDim);
+  r.setProperty('--green', t.green);
+  document.querySelectorAll('.themeDot').forEach(d=> d.classList.toggle('active', d.dataset.theme===name));
+  try{ localStorage.setItem('theme', name); }catch(e){}
+}
+function initThemePicker(){
+  const row = document.getElementById('themeRow');
+  row.innerHTML = '';
+  Object.keys(THEMES).forEach(key=>{
+    const t = THEMES[key];
+    const dot = document.createElement('div');
+    dot.className = 'themeDot';
+    dot.dataset.theme = key;
+    dot.title = t.label;
+    dot.style.background = t.accent;
+    dot.style.boxShadow = 'inset 0 0 0 8px ' + t.bg;
+    dot.addEventListener('click', ()=> applyTheme(key));
+    row.appendChild(dot);
+  });
+  let saved = 'desklamp';
+  try{ saved = localStorage.getItem('theme') || 'desklamp'; }catch(e){}
+  applyTheme(saved);
+}
+initThemePicker();
+
+let knownUser = null; // set when the typed ID already has an account
+
+async function checkId(){
+  const id = document.getElementById('idInput').value.trim();
+  const nameField = document.getElementById('nameInput');
+  const welcome = document.getElementById('welcomeBack');
+  if(!id){ knownUser = null; nameField.classList.remove('hidden'); welcome.classList.add('hidden'); return; }
+  const r = await sGet('user:'+id);
+  if(r){
+    knownUser = safeParse(r.value, null);
+    if(knownUser){
+      nameField.classList.add('hidden');
+      welcome.textContent = 'Welcome back, ' + knownUser.name + '. Enter your password.';
+      welcome.classList.remove('hidden');
+      return;
+    }
+  }
+  knownUser = null;
+  nameField.classList.remove('hidden');
+  welcome.classList.add('hidden');
+}
+document.getElementById('idInput').addEventListener('blur', checkId);
+document.getElementById('idInput').addEventListener('input', ()=>{
+  clearTimeout(window._idTimer);
+  window._idTimer = setTimeout(checkId, 400);
+});
+
+async function doLogin(){
+  const id = document.getElementById('idInput').value.trim();
+  const name = document.getElementById('nameInput').value.trim();
+  const pass = document.getElementById('passInput').value;
+  const err = document.getElementById('loginErr');
+  err.textContent = '';
+  if(!id || !pass || (!knownUser && !name)){ err.textContent = 'Enter your ID, name and password.'; return; }
+  if(knownUser){
+    if(knownUser.password !== pass){ err.textContent = 'Wrong password for this ID.'; return; }
+    ME = {id, name: knownUser.name};
+  } else {
+    await sSet('user:'+id, JSON.stringify({name, password: pass}));
+    ME = {id, name};
+  }
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('main').classList.remove('hidden');
+  document.getElementById('whoami').textContent = ME.name + ' · ' + ME.id;
+  initChat(); initDiscuss(); initTodo(); initStreak();
+}
+
+// ---- Tabs ----
+document.querySelectorAll('nav button').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    document.querySelectorAll('#main > section').forEach(s=>s.classList.add('hidden'));
+    document.getElementById('tab-'+b.dataset.tab).classList.remove('hidden');
+  });
+});
+
+// ---- Chat ----
+const AVATAR_COLORS = ['#c96a5a','#5a8fc9','#6fae8c','#c9a15a','#9a6ac9','#5ac9b8','#c95a95'];
+function colorFor(name){
+  let h = 0;
+  for(let i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i)) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[Math.abs(h)];
+}
+function initials(name){ return name.trim().slice(0,2).toUpperCase(); }
+
+async function getChatList(){
+  try{
+    const r = await sGet('chat:messages');
+    return r ? safeParse(r.value, []) : [];
+  }catch(e){ return []; }
+}
+async function loadChat(){
+  const list = await getChatList();
+  const log = document.getElementById('chatLog');
+  log.innerHTML = '';
+  list.slice(-100).forEach(m=>{
+    if(!m.votes) m.votes = [];
+    const mine = m.id===ME.id;
+    const voted = m.votes.includes(ME.id);
+    const div = document.createElement('div');
+    div.className = 'msg' + (mine ? ' mine' : '');
+    div.innerHTML = `
+      <div class="avatar" style="background:${colorFor(m.name)}">${initials(m.name)}</div>
+      <div class="col">
+        ${mine ? '' : `<div class="name">${escapeHtml(m.name)}</div>`}
+        <div class="bubbleRow">
+          <div class="bubble">${escapeHtml(m.text)}</div>
+          <button class="liftMini ${voted?'voted':''}" onclick="voteMsg('${m.mid}')">▲</button>
+        </div>
+        <div class="votes">${m.votes.length} lift${m.votes.length===1?'':'s'}</div>
+      </div>`;
+    log.appendChild(div);
+  });
+  log.scrollTop = log.scrollHeight;
+}
+async function sendChat(){
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if(!text) return;
+  input.value = '';
+  const list = await getChatList();
+  list.push({mid: ME.id+'-'+Date.now(), id: ME.id, name: ME.name, text, votes: [], time: Date.now()});
+  const trimmed = list.length > 300 ? list.slice(-300) : list;
+  await sSet('chat:messages', JSON.stringify(trimmed));
+  loadChat();
+}
+async function voteMsg(mid){
+  const list = await getChatList();
+  const m = list.find(x=>x.mid===mid);
+  if(!m) return;
+  if(!m.votes) m.votes = [];
+  const i = m.votes.indexOf(ME.id);
+  if(i>=0) m.votes.splice(i,1); else m.votes.push(ME.id);
+  await sSet('chat:messages', JSON.stringify(list));
+  loadChat();
+  loadTrendingChat();
+}
+async function loadTrendingChat(){
+  const list = await getChatList();
+  const top = [...list].filter(m=>(m.votes||[]).length>0).sort((a,b)=>(b.votes.length-a.votes.length)).slice(0,30);
+  const box = document.getElementById('chatTrendView');
+  box.innerHTML = '';
+  if(top.length===0){ box.innerHTML = '<p style="color:var(--text-dim); font-size:0.9rem;">No lifted messages yet — vote a message in the Room to see it here.</p>'; return; }
+  top.forEach(m=>{
+    const voted = (m.votes||[]).includes(ME.id);
+    const row = document.createElement('div');
+    row.className = 'trendMsg';
+    row.innerHTML = `
+      <div>
+        <div class="n">${escapeHtml(m.name)}</div>
+        <div class="t">${escapeHtml(m.text)}</div>
+      </div>
+      <button class="liftMini ${voted?'voted':''}" onclick="voteMsg('${m.mid}')">▲ ${m.votes.length}</button>`;
+    box.appendChild(row);
+  });
+}
+document.querySelectorAll('[data-chatview]').forEach(s=>{
+  s.addEventListener('click', ()=>{
+    document.querySelectorAll('[data-chatview]').forEach(x=>x.classList.remove('active'));
+    s.classList.add('active');
+    const isRoom = s.dataset.chatview === 'room';
+    document.getElementById('chatRoomView').classList.toggle('hidden', !isRoom);
+    document.getElementById('chatTrendView').classList.toggle('hidden', isRoom);
+    if(!isRoom) loadTrendingChat();
+  });
+});
+function initChat(){
+  loadChat();
+  clearInterval(chatPoll);
+  chatPoll = setInterval(()=>{ loadChat(); loadTrendingChat(); }, 3000);
+}
+
+// ---- Discussion ----
+let sortMode = 'new';
+document.querySelectorAll('#tab-discuss .subtabs span').forEach(s=>{
+  s.addEventListener('click', ()=>{
+    document.querySelectorAll('#tab-discuss .subtabs span').forEach(x=>x.classList.remove('active'));
+    s.classList.add('active');
+    sortMode = s.dataset.sort;
+    loadPosts();
+  });
+});
+async function loadPosts(){
+  let list = [];
+  try{
+    const r = await sGet('discuss:posts');
+    list = r ? safeParse(r.value, []) : [];
+  }catch(e){ list = []; }
+  let shown = [...list];
+  if(sortMode === 'top') shown.sort((a,b)=> b.votes.length - a.votes.length);
+  else shown.sort((a,b)=> b.time - a.time);
+  const box = document.getElementById('postList');
+  box.innerHTML = '';
+  shown.forEach(p=>{
+    const voted = p.votes.includes(ME.id);
+    const div = document.createElement('div');
+    div.className = 'post';
+    div.innerHTML = `
+      <div class="lift">
+        <button class="${voted?'voted':''}" onclick="vote('${p.pid}')">▲</button>
+        <div class="count">${p.votes.length}</div>
+      </div>
+      <div class="body">
+        <div class="meta">${escapeHtml(p.name)} · ${new Date(p.time).toLocaleString()}</div>
+        <div class="text">${escapeHtml(p.text)}</div>
+      </div>`;
+    box.appendChild(div);
+  });
+}
+async function addPost(){
+  const input = document.getElementById('postInput');
+  const text = input.value.trim();
+  if(!text) return;
+  input.value = '';
+  let list = [];
+  try{
+    const r = await sGet('discuss:posts');
+    list = r ? safeParse(r.value, []) : [];
+  }catch(e){ list = []; }
+  list.push({pid: ME.id+'-'+Date.now(), id: ME.id, name: ME.name, text, votes: [], time: Date.now()});
+  await sSet('discuss:posts', JSON.stringify(list));
+  loadPosts();
+}
+async function vote(pid){
+  let list = [];
+  try{
+    const r = await sGet('discuss:posts');
+    list = r ? safeParse(r.value, []) : [];
+  }catch(e){ list = []; }
+  const p = list.find(x=>x.pid===pid);
+  if(!p) return;
+  const i = p.votes.indexOf(ME.id);
+  if(i>=0) p.votes.splice(i,1); else p.votes.push(ME.id);
+  await sSet('discuss:posts', JSON.stringify(list));
+  loadPosts();
+}
+function initDiscuss(){
+  loadPosts();
+  clearInterval(postPoll);
+  postPoll = setInterval(loadPosts, 4000);
+}
+
+// ---- Todo (personal, keyed by login id) ----
+async function loadTodos(){
+  let list = [];
+  try{
+    const r = await sGet('todos:'+ME.id);
+    list = r ? safeParse(r.value, []) : [];
+  }catch(e){ list = []; }
+  const box = document.getElementById('todoList');
+  box.innerHTML = '';
+  list.forEach((t,i)=>{
+    const row = document.createElement('div');
+    row.className = 'todoRow';
+    row.innerHTML = `
+      <input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo(${i})">
+      <div class="txt ${t.done?'done':''}">${escapeHtml(t.text)}</div>
+      <button class="del" onclick="delTodo(${i})">✕</button>`;
+    box.appendChild(row);
+  });
+}
+async function getTodos(){
+  try{
+    const r = await sGet('todos:'+ME.id);
+    return r ? safeParse(r.value, []) : [];
+  }catch(e){ return []; }
+}
+async function addTodo(){
+  const input = document.getElementById('todoInput');
+  const text = input.value.trim();
+  if(!text) return;
+  input.value = '';
+  const list = await getTodos();
+  list.push({text, done:false});
+  await sSet('todos:'+ME.id, JSON.stringify(list));
+  loadTodos();
+}
+async function toggleTodo(i){
+  const list = await getTodos();
+  list[i].done = !list[i].done;
+  await sSet('todos:'+ME.id, JSON.stringify(list));
+  loadTodos();
+}
+async function delTodo(i){
+  const list = await getTodos();
+  list.splice(i,1);
+  await sSet('todos:'+ME.id, JSON.stringify(list));
+  loadTodos();
+}
+function initTodo(){ loadTodos(); }
+
+// ---- Pomodoro ----
+let pomoLen = 25*60, pomoRemaining = 25*60, pomoRunning = false, pomoInterval, pomoIsFocus = true;
+document.querySelectorAll('.pomoModes span').forEach(s=>{
+  s.addEventListener('click', ()=>{
+    document.querySelectorAll('.pomoModes span').forEach(x=>x.classList.remove('active'));
+    s.classList.add('active');
+    pomoLen = parseInt(s.dataset.len)*60;
+    pomoRemaining = pomoLen;
+    pomoIsFocus = s.dataset.len === '25';
+    document.getElementById('pomoLabel').textContent = s.textContent;
+    pausePomo();
+    renderPomo();
+  });
+});
+function renderPomo(){
+  const m = String(Math.floor(pomoRemaining/60)).padStart(2,'0');
+  const s = String(pomoRemaining%60).padStart(2,'0');
+  document.getElementById('pomoTime').textContent = m+':'+s;
+}
+function togglePomo(){ pomoRunning ? pausePomo() : startPomo(); }
+function startPomo(){
+  pomoRunning = true;
+  document.getElementById('pomoStart').textContent = 'Pause';
+  pomoInterval = setInterval(()=>{
+    pomoRemaining--;
+    if(pomoRemaining<=0){
+      pausePomo();
+      pomoRemaining=0;
+      if(pomoIsFocus) recordStreak();
+    }
+    renderPomo();
+  },1000);
+}
+function pausePomo(){
+  pomoRunning = false;
+  clearInterval(pomoInterval);
+  document.getElementById('pomoStart').textContent = 'Start';
+}
+function resetPomo(){
+  pausePomo();
+  pomoRemaining = pomoLen;
+  renderPomo();
+}
+
+// ---- Streak heatmap (like a LeetCode submission calendar) ----
+function dayKey(d){ return d.toISOString().slice(0,10); }
+async function getStreakMap(){
+  try{
+    const r = await sGet('streak:'+ME.id);
+    return r ? safeParse(r.value, {}) : {};
+  }catch(e){ return {}; }
+}
+async function recordStreak(){
+  const map = await getStreakMap();
+  const key = dayKey(new Date());
+  map[key] = (map[key]||0) + 1;
+  await sSet('streak:'+ME.id, JSON.stringify(map));
+  renderStreak(map);
+}
+function renderStreak(map){
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const days = [];
+  for(let i=364;i>=0;i--){
+    const d = new Date(today);
+    d.setDate(d.getDate()-i);
+    days.push(d);
+  }
+  // pad to start of week (Sunday)
+  const lead = days[0].getDay();
+  const padded = Array(lead).fill(null).concat(days);
+  const weeks = [];
+  for(let i=0;i<padded.length;i+=7) weeks.push(padded.slice(i,i+7));
+
+  const grid = document.getElementById('heatmap');
+  grid.innerHTML = '';
+  let total = 0, activeDays = 0, curStreak = 0, maxStreak = 0;
+  days.forEach(d=>{
+    const c = map[dayKey(d)]||0;
+    if(c>0){ activeDays++; total+=c; curStreak++; maxStreak = Math.max(maxStreak, curStreak); }
+    else curStreak = 0;
+  });
+
+  const monthsRow = document.getElementById('heatMonths');
+  monthsRow.innerHTML = '';
+  let lastMonth = -1;
+  weeks.forEach(week=>{
+    const col = document.createElement('div');
+    col.className = 'heatcol';
+    let colMonth = -1;
+    week.forEach(d=>{
+      const cell = document.createElement('div');
+      if(!d){ cell.className='heatcell'; col.appendChild(cell); return; }
+      colMonth = d.getMonth();
+      const c = map[dayKey(d)]||0;
+      let lvl = c===0 ? '' : c===1 ? 'l1' : c===2 ? 'l2' : c<=4 ? 'l3' : 'l4';
+      cell.className = 'heatcell ' + lvl;
+      cell.title = dayKey(d) + ': ' + c + ' session' + (c===1?'':'s');
+      col.appendChild(cell);
+    });
+    grid.appendChild(col);
+    const label = document.createElement('div');
+    label.style.width = '11px';
+    if(colMonth !== lastMonth && colMonth !== -1){
+      label.textContent = col.firstChild ? new Date(2000,colMonth,1).toLocaleString('en',{month:'short'}) : '';
+      lastMonth = colMonth;
+    }
+    monthsRow.appendChild(label);
+  });
+
+  document.getElementById('streakTotal').innerHTML = total + ' <span style="font-size:0.85rem; color:var(--text-dim); font-weight:400;">focus sessions in the past year</span>';
+  document.getElementById('streakDays').textContent = activeDays;
+  document.getElementById('streakMax').textContent = maxStreak;
+}
+async function initStreak(){
+  const map = await getStreakMap();
+  renderStreak(map);
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>

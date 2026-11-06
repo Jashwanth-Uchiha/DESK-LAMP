@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Desk Lamp</title>
+  <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- Shown when Firebase settings are missing -->
+  <section id="view-config" class="center-view hidden" aria-labelledby="configTitle">
+    <h1 id="configTitle">Desk Lamp isn't configured</h1>
+    <p id="configMsg" class="dim"></p>
+  </section>
+
+  <!-- Initial auth check -->
+  <section id="view-loading" class="center-view" aria-live="polite">
+    <p class="dim">Loading…</p>
+  </section>
+
+  <!-- Sign in / create account / reset -->
+  <section id="view-auth" class="center-view hidden" aria-labelledby="authTitle">
+    <h1 id="authTitle">Desk Lamp</h1>
+    <p class="dim tagline">A quiet corner for chat, doubts, tasks, and focused work.</p>
+
+    <div class="pill-tabs" role="tablist" aria-label="Account">
+      <button role="tab" id="tab-signin" aria-selected="true" aria-controls="form-signin" data-authview="signin">Sign in</button>
+      <button role="tab" id="tab-signup" aria-selected="false" aria-controls="form-signup" data-authview="signup">Create account</button>
+    </div>
+
+    <form id="form-signin" class="auth-form" role="tabpanel" aria-labelledby="tab-signin" novalidate>
+      <label for="siEmail">Email</label>
+      <input id="siEmail" name="email" type="email" autocomplete="email" required>
+      <label for="siPass">Password</label>
+      <input id="siPass" name="password" type="password" autocomplete="current-password" required>
+      <label class="check"><input id="siRemember" type="checkbox" checked> Keep me signed in on this device</label>
+      <button type="submit" class="btn">Sign in</button>
+      <button type="button" class="link" data-authview="reset">Forgot password?</button>
+      <p class="form-msg" role="alert" aria-live="assertive"></p>
+    </form>
+
+    <form id="form-signup" class="auth-form hidden" role="tabpanel" aria-labelledby="tab-signup" novalidate>
+      <label for="suName">Display name <span class="dim">(shown to others)</span></label>
+      <input id="suName" name="displayName" autocomplete="nickname" maxlength="40" required>
+      <label for="suRoll">Roll number <span class="dim">(private — not shown to other students)</span></label>
+      <input id="suRoll" name="rollNumber" class="mono" maxlength="20" autocomplete="off" required>
+      <label for="suEmail">Email <span class="dim">(college email recommended)</span></label>
+      <input id="suEmail" name="email" type="email" autocomplete="email" required>
+      <label for="suPass">Password <span class="dim">(at least 8 characters)</span></label>
+      <input id="suPass" name="password" type="password" autocomplete="new-password" minlength="8" required>
+      <label for="suPass2">Confirm password</label>
+      <input id="suPass2" name="password2" type="password" autocomplete="new-password" required>
+      <button type="submit" class="btn">Create account</button>
+      <p class="form-msg" role="alert" aria-live="assertive"></p>
+    </form>
+
+    <form id="form-reset" class="auth-form hidden" novalidate aria-labelledby="resetTitle">
+      <h2 id="resetTitle">Reset your password</h2>
+      <label for="rsEmail">Email</label>
+      <input id="rsEmail" name="email" type="email" autocomplete="email" required>
+      <button type="submit" class="btn">Send reset link</button>
+      <button type="button" class="link" data-authview="signin">Back to sign in</button>
+      <p class="form-msg" role="status" aria-live="polite"></p>
+    </form>
+  </section>
+
+  <!-- Signed in but no profile yet (e.g. profile write failed during sign-up) -->
+  <section id="view-profile" class="center-view hidden" aria-labelledby="profileTitle">
+    <h1 id="profileTitle">Finish setting up</h1>
+    <p class="dim">Choose the name others will see, and add your roll number. Your roll number stays private.</p>
+    <form id="form-profile" class="auth-form" novalidate>
+      <label for="pfName">Display name</label>
+      <input id="pfName" name="displayName" maxlength="40" required>
+      <label for="pfRoll">Roll number</label>
+      <input id="pfRoll" name="rollNumber" class="mono" maxlength="20" required>
+      <button type="submit" class="btn">Save</button>
+      <button type="button" class="link" data-action="signout">Sign out</button>
+      <p class="form-msg" role="alert" aria-live="assertive"></p>
+    </form>
+  </section>
+
+  <!-- Main app -->
+  <div id="view-main" class="hidden">
+    <header class="topbar">
+      <h1>Desk Lamp</h1>
+      <div class="topbar-right">
+        <div class="themeRow" id="themeRow" role="radiogroup" aria-label="Theme"></div>
+        <span class="who" id="whoami"></span>
+        <span class="role-badge hidden" id="roleBadge"></span>
+        <button type="button" class="btn-ghost" data-action="signout">Sign out</button>
+      </div>
+    </header>
+
+    <div id="verifyBanner" class="banner hidden" role="status">
+      <span>Verify your email to use Chat and Discussion. Check your inbox for the link.</span>
+      <button type="button" class="btn-ghost" id="resendVerify">Resend email</button>
+      <button type="button" class="btn-ghost" id="checkVerify">I've verified</button>
+      <span id="verifyMsg" class="dim"></span>
+    </div>
+    <div id="suspendedBanner" class="banner warn hidden" role="status"></div>
+
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button role="tab" aria-selected="true" aria-controls="tab-chat" data-tab="chat">Chat</button>
+      <button role="tab" aria-selected="false" aria-controls="tab-discuss" data-tab="discuss">Discussion</button>
+      <button role="tab" aria-selected="false" aria-controls="tab-todo" data-tab="todo">To-Do</button>
+      <button role="tab" aria-selected="false" aria-controls="tab-pomo" data-tab="pomo">Pomodoro</button>
+    </nav>
+
+    <section id="tab-chat" class="panel" role="tabpanel">
+      <div class="subtabs" role="tablist" aria-label="Chat view">
+        <button role="tab" aria-selected="true" data-chatview="room">Room</button>
+        <button role="tab" aria-selected="false" data-chatview="trending">Trending</button>
+      </div>
+      <div id="chatRoomView">
+        <div id="chatLog" aria-live="polite" aria-label="Chat messages"></div>
+        <form class="chatRow" id="chatForm">
+          <label for="chatInput" class="sr-only">Message</label>
+          <input id="chatInput" placeholder="Say something…" maxlength="1000" autocomplete="off">
+          <button class="btn" type="submit">Send</button>
+        </form>
+        <p class="form-msg" id="chatMsg" role="alert"></p>
+      </div>
+      <div id="chatTrendView" class="hidden"></div>
+    </section>
+
+    <section id="tab-discuss" class="panel hidden" role="tabpanel">
+      <form class="postForm" id="postForm">
+        <label for="postInput" class="sr-only">New post</label>
+        <textarea id="postInput" placeholder="Post a doubt or a note for the room…" maxlength="4000"></textarea>
+        <button class="btn" type="submit">Post</button>
+      </form>
+      <p class="form-msg" id="postMsg" role="alert"></p>
+      <div class="subtabs" role="tablist" aria-label="Sort posts">
+        <button role="tab" aria-selected="true" data-sort="new">Newest</button>
+        <button role="tab" aria-selected="false" data-sort="top">Trending</button>
+      </div>
+      <div id="postList"></div>
+    </section>
+
+    <section id="tab-todo" class="panel hidden" role="tabpanel">
+      <p class="dim small">Only you can see your tasks.</p>
+      <form class="addRow" id="todoForm">
+        <label for="todoInput" class="sr-only">New task</label>
+        <input id="todoInput" placeholder="Add a task…" maxlength="500" autocomplete="off">
+        <button class="btn" type="submit">Add</button>
+      </form>
+      <p class="form-msg" id="todoMsg" role="alert"></p>
+      <div id="todoList"></div>
+    </section>
+
+    <section id="tab-pomo" class="panel hidden" role="tabpanel">
+      <div id="pomo">
+        <div class="pomoModes" role="radiogroup" aria-label="Timer length">
+          <button type="button" role="radio" aria-checked="true" data-len="25" data-focus="true">Focus 25</button>
+          <button type="button" role="radio" aria-checked="false" data-len="5">Break 5</button>
+          <button type="button" role="radio" aria-checked="false" data-len="15">Long break 15</button>
+        </div>
+        <div id="pomoLabel" class="dim">Focus session</div>
+        <div id="pomoTime" class="mono" role="timer" aria-live="off">25:00</div>
+        <div class="pomoBtns">
+          <button type="button" class="primary" id="pomoStart">Start</button>
+          <button type="button" id="pomoReset">Reset</button>
+        </div>
+        <p class="form-msg" id="pomoMsg" role="status"></p>
+      </div>
+      <div class="streakWrap">
+        <div class="streakHead">
+          <div class="big"><span id="streakTotal">0</span> <span class="dim small">focus sessions in the past year</span></div>
+          <div class="stat">Current streak: <b id="streakCur">0</b> &nbsp; Active days: <b id="streakDays">0</b> &nbsp; Max streak: <b id="streakMax">0</b></div>
+        </div>
+        <div class="heatmap" id="heatmap" role="img" aria-label="Focus sessions per day for the past year"></div>
+        <div class="heatMonths" id="heatMonths" aria-hidden="true"></div>
+      </div>
+    </section>
+  </div>
+</div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+{
+  // Desk Lamp — Realtime Database security rules (Milestone 1).
+  // Deny by default. Every path that the app uses is listed explicitly.
+  // Roles live in /roles/{uid} and only admins can write them, so role checks
+  // here are trusted. Bootstrap the first admin from the Firebase console.
+  // Limits must match src/lib/validation.js.
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    // ---------- Private identity record (owner + admins only) ----------
+    "users": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && newData.exists()",
+        ".validate": "newData.hasChildren(['displayName', 'rollNumber', 'createdAt'])",
+        "displayName": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40 && !newData.val().matches(/.*[<>].*/)"
+        },
+        "rollNumber": {
+          ".validate": "newData.isString() && newData.val().matches(/^[A-Z0-9-]{3,20}$/) && (!data.exists() || data.val() === newData.val()) && newData.parent().parent().parent().child('rollIndex').child(newData.val()).val() === $uid"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber() && ((data.exists() && newData.val() === data.val()) || (!data.exists() && newData.val() === now))"
+        },
+        "$other": { ".validate": false }
+      }
+    },
+
+    // ---------- Public profile: display name only. Readable one at a time, not listable ----------
+    "publicProfiles": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid && newData.exists()",
+        ".validate": "newData.hasChildren(['displayName'])",
+        "displayName": {
+          ".validate": "newData.isString() && newData.val() === newData.parent().parent().parent().child('users').child($uid).child('displayName').val()"
+        },
+        "$other": { ".validate": false }
+      }
+    },
+
+    // ---------- Roll number → uid. Enforces one account per roll number ----------
+    "rollIndex": {
+      "$roll": {
+        ".read": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
+        ".write": "auth != null && ((!data.exists() && newData.val() === auth.uid && newData.parent().parent().child('users').child(auth.uid).child('rollNumber').val() === $roll) || root.child('roles').child(auth.uid).val() === 'admin')",
+        ".validate": "newData.isString()"
+      }
+    },
+
+    // ---------- Roles: admin-managed. Missing entry = student ----------
+    "roles": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid !== $uid && root.child('roles').child(auth.uid).val() === 'admin'",
+        ".validate": "newData.isString() && newData.val().matches(/^(student|senior|counselor|moderator|admin)$/)"
+      }
+    },
+
+    // ---------- Account restrictions ----------
+    "moderation": {
+      "suspended": {
+        ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'moderator' || root.child('roles').child(auth.uid).val() === 'admin')",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && auth.uid !== $uid && (root.child('roles').child(auth.uid).val() === 'admin' || (root.child('roles').child(auth.uid).val() === 'moderator' && root.child('roles').child($uid).val() !== 'moderator' && root.child('roles').child($uid).val() !== 'admin'))",
+          ".validate": "newData.hasChildren(['reason', 'by', 'at'])",
+          "reason": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 500" },
+          "by": { ".validate": "newData.val() === auth.uid" },
+          "at": { ".validate": "newData.val() === now" },
+          "$other": { ".validate": false }
+        }
+      },
+      "muted": {
+        ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'moderator' || root.child('roles').child(auth.uid).val() === 'admin')",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && auth.uid !== $uid && (root.child('roles').child(auth.uid).val() === 'admin' || (root.child('roles').child(auth.uid).val() === 'moderator' && root.child('roles').child($uid).val() !== 'moderator' && root.child('roles').child($uid).val() !== 'admin'))",
+          ".validate": "newData.hasChildren(['reason', 'by', 'at'])",
+          "reason": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 500" },
+          "by": { ".validate": "newData.val() === auth.uid" },
+          "at": { ".validate": "newData.val() === now" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
+
+    // ---------- Chat: one record per message; only the 'general' room for now ----------
+    "rooms": {
+      "$roomId": {
+        "messages": {
+          ".read": "auth != null && auth.token.email_verified === true && $roomId === 'general' && query.orderByChild === 'createdAt' && query.limitToLast <= 200",
+          ".indexOn": ["createdAt"],
+          "$mid": {
+            ".write": "auth != null && auth.token.email_verified === true && $roomId === 'general' && ((!data.exists() && newData.child('uid').val() === auth.uid && root.child('publicProfiles').child(auth.uid).exists() && !root.child('moderation').child('suspended').child(auth.uid).exists() && !root.child('moderation').child('muted').child(auth.uid).exists()) || (data.exists() && !newData.exists() && (data.child('uid').val() === auth.uid || root.child('roles').child(auth.uid).val() === 'moderator' || root.child('roles').child(auth.uid).val() === 'admin')))",
+            ".validate": "newData.hasChildren(['uid', 'name', 'text', 'createdAt'])",
+            "uid": { ".validate": "(data.exists() && newData.val() === data.val()) || (!data.exists() && newData.val() === auth.uid)" },
+            "name": { ".validate": "(data.exists() && newData.val() === data.val()) || (!data.exists() && newData.isString() && newData.val() === root.child('publicProfiles').child(auth.uid).child('displayName').val())" },
+            "text": { ".validate": "(data.exists() && newData.val() === data.val()) || (!data.exists() && newData.isString() && newData.val().length >= 1 && newData.val().length <= 1000)" },
+            "createdAt": { ".validate": "(data.exists() && newData.val() === data.val()) || (!data.exists() && newData.val() === now)" },
+            "votes": {
+              "$voter": {
+                ".write": "auth != null && auth.token.email_verified === true && $voter === auth.uid && data.parent().parent().exists() && root.child('publicProfiles').child(auth.uid).exists() && !root.child('moderation').child('suspended').child(auth.uid).exists()",
+                ".validate": "newData.val() === true && $voter === auth.uid"
+              }
+            },
+            "hidden": {
+              ".write": "auth != null && auth.token.email_verified === true && data.parent().exists() && (root.child('roles').child(auth.uid).val() === 'moderator' || root.child('roles').child(auth.uid).val() === 'admin')",
+              ".validate": "newData.hasChildren(['by', 'at']) && (root.child('roles').child(auth.uid).val() === 'moderator' || root.child('roles').child(auth.uid).val() === 'admin')",
+              "by": { ".validate": "newData.val() === auth.uid" },
+              "at": { ".validate": "newData.val() === now" },
+              "$other": { ".validate": false }
+            },
+            "$other": { ".validate": false }
+          }
+        }
+      }
+    },
+
+    // ---------- Discussion posts: same model as chat, longer text ----------
+    "posts": {
+      ".read": "auth != null && auth.token.email_verified === true && query.orderByChild === 'createdAt' && query.limitToLast <= 200",
+      ".indexOn": ["createdAt"],
+      "$pid": {
+        ".write": "auth != null && auth.token.email_verified === true && ((!data.exists() && newData.child('uid').val() === auth.uid && root.child('publicProfiles').child(auth.uid).exists() && !root.child('moderation').child('suspended').child(auth.uid).exists() && !root.child('moderation').child('muted').child(auth.uid).exists()) || (data.exists() && !newData.exists() && (data.child('uid').val() === auth.uid || root.child('roles').child(auth.uid).val() === 'moderator' || root.child('roles').child(auth.uid).val() === 'admin')))",
+        ".validate": "newData.hasChildren(['uid', 'name', 'text', 'createdAt'])",
+        "uid": { ".validate": "(data.exists() && newData.val() === data.val()) || (!data.exists() && newData.val() === auth.uid)" },
+        "name": { ".validate": "(data.exists() && newData.val() === data.val()) || (!data.exists() && newData.isString() && newData.val() === root.child('publicProfiles').child(auth.uid).child('displayName').val())" },
+        "text": { ".validate": "(data.exists() && newData.val() === data.val()) || (!data.exists() && newData.isString() && newData.val().length >= 1 && newData.val().length <= 4000)" },
+        "createdAt": { ".validate": "(data.exists() && newData.val() === data.val()) || (!data.exists() && newData.val() === now)" },
+        "votes": {
+          "$voter": {
+            ".write": "auth != null && auth.token.email_verified === true && $voter === auth.uid && data.parent().parent().exists() && root.child('publicProfiles').child(auth.uid).exists() && !root.child('moderation').child('suspended').child(auth.uid).exists()",
+            ".validate": "newData.val() === true && $voter === auth.uid"
+          }
+        },
+        "hidden": {
+          ".write": "auth != null && auth.token.email_verified === true && data.parent().exists() && (root.child('roles').child(auth.uid).val() === 'moderator' || root.child('roles').child(auth.uid).val() === 'admin')",
+          ".validate": "newData.hasChildren(['by', 'at']) && (root.child('roles').child(auth.uid).val() === 'moderator' || root.child('roles').child(auth.uid).val() === 'admin')",
+          "by": { ".validate": "newData.val() === auth.uid" },
+          "at": { ".validate": "newData.val() === now" },
+          "$other": { ".validate": false }
+        },
+        "$other": { ".validate": false }
+      }
+    },
+
+    // ---------- Private productivity data: owner only ----------
+    "userData": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "todos": {
+          "$tid": {
+            ".validate": "newData.hasChildren(['text', 'done', 'createdAt'])",
+            "text": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 500" },
+            "done": { ".validate": "newData.isBoolean()" },
+            "createdAt": { ".validate": "newData.isNumber() && newData.val() <= now" },
+            "$other": { ".validate": false }
+          }
+        },
+        "streak": {
+          "$day": {
+            ".validate": "$day.matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 100 && newData.val() % 1 === 0"
+          }
+        },
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}

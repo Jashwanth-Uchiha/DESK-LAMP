@@ -1,0 +1,30 @@
+{
+  "name": "desk-lamp",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Desk Lamp — student community and support platform",
+  "scripts": {
+    "dev": "vite",
+    "dev:emulators": "firebase emulators:start --only auth,database --project demo-desk-lamp",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "npm run test:unit && npm run test:rules",
+    "test:unit": "vitest run tests/unit",
+    "test:rules": "firebase emulators:exec --only database --project demo-desk-lamp \"vitest run tests/rules\"",
+    "deploy:rules": "firebase deploy --only database",
+    "deploy": "npm run build && firebase deploy --only hosting,database"
+  },
+  "dependencies": {
+    "firebase": "^11.0.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.0",
+    "firebase-tools": "^13.20.0",
+    "vite": "^5.4.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
